@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Get API URL from environment or use default
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8003/api';
+// Temporarily hardcode for deployment
+const API_URL = 'https://campus-mart-lbim.onrender.com/api';
 
 const API = axios.create({
     baseURL: API_URL,
