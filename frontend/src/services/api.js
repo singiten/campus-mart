@@ -59,6 +59,7 @@ export const getGroupOrders = (campus) => API.get(`/group-orders/active/${campus
 export const createGroupOrder = (data) => API.post('/group-orders', data);
 export const getGroupOrder = (id) => API.get(`/group-orders/${id}`);
 export const joinGroupOrder = (id, quantity) => API.post(`/group-orders/${id}/join`, { quantity });
+export const joinGroupByCode = (code, productId) => API.post('/group-orders/join-by-code', { code, productId });
 export const getMyGroups = () => API.get('/group-orders/my-groups');
 
 // ========== WISHLIST APIs ==========
