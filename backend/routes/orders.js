@@ -161,4 +161,299 @@ router.get('/my-orders', protect, async (req, res) => {
     }
 });
 
+// ========== VENDOR ORDER ENDPOINTS (NEW - Added without changing existing code) ==========
+
+// Get orders assigned to the logged-in vendor
+router.get('/vendor/orders', protect, async (req, res) => {
+    try {
+        // Check if the user is a vendor
+        if (req.user.role !== 'vendor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. Vendor only.' 
+            });
+        }
+
+        // Find vendor document to get vendor ID
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findOne({ user: req.user._id });
+        
+        if (!vendor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Vendor profile not found' 
+            });
+        }
+
+        // Find orders assigned to this vendor
+        const orders = await Order.find({ 
+            assignedVendor: vendor._id 
+        })
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name price imageUrl')
+        .sort('-assignedAt');
+
+        res.json({ 
+            success: true, 
+            count: orders.length, 
+            data: orders 
+        });
+        
+    } catch (error) {
+        console.error('Error fetching vendor orders:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
+// Get a specific order details for vendor
+router.get('/vendor/orders/:orderId', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'vendor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. Vendor only.' 
+            });
+        }
+
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findOne({ user: req.user._id });
+        
+        if (!vendor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Vendor profile not found' 
+            });
+        }
+
+        const order = await Order.findOne({ 
+            _id: req.params.orderId, 
+            assignedVendor: vendor._id 
+        })
+        .populate('user', 'name email phone')
+        .populate('items.product', 'name price imageUrl');
+
+        if (!order) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Order not found or not assigned to you' 
+            });
+        }
+
+        res.json({ success: true, data: order });
+        
+    } catch (error) {
+        console.error('Error fetching vendor order details:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
+// Vendor accepts an order
+router.put('/vendor/orders/:orderId/accept', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'vendor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. Vendor only.' 
+            });
+        }
+
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findOne({ user: req.user._id });
+        
+        if (!vendor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Vendor profile not found' 
+            });
+        }
+
+        const order = await Order.findOne({ 
+            _id: req.params.orderId, 
+            assignedVendor: vendor._id 
+        });
+
+        if (!order) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Order not found or not assigned to you' 
+            });
+        }
+
+        if (order.status !== 'assigned') {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Cannot accept order with status: ${order.status}` 
+            });
+        }
+
+        order.status = 'accepted';
+        order.acceptedAt = new Date();
+        order.vendorAccepted = true;
+        await order.save();
+
+        // Emit socket event
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`order-${order._id}`).emit('order-status-update', {
+                orderId: order._id,
+                status: 'accepted',
+                message: 'Vendor has accepted the order'
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Order accepted successfully', 
+            data: order 
+        });
+        
+    } catch (error) {
+        console.error('Error accepting order:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
+// Vendor marks order as picked up
+router.put('/vendor/orders/:orderId/pickup', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'vendor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. Vendor only.' 
+            });
+        }
+
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findOne({ user: req.user._id });
+        
+        if (!vendor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Vendor profile not found' 
+            });
+        }
+
+        const order = await Order.findOne({ 
+            _id: req.params.orderId, 
+            assignedVendor: vendor._id 
+        });
+
+        if (!order) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Order not found or not assigned to you' 
+            });
+        }
+
+        if (order.status !== 'accepted') {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Cannot mark as picked up. Current status: ${order.status}` 
+            });
+        }
+
+        order.status = 'picked_up';
+        order.pickedUpAt = new Date();
+        await order.save();
+
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`order-${order._id}`).emit('order-status-update', {
+                orderId: order._id,
+                status: 'picked_up',
+                message: 'Order has been picked up'
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Order marked as picked up', 
+            data: order 
+        });
+        
+    } catch (error) {
+        console.error('Error marking order as picked up:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
+// Vendor marks order as delivered
+router.put('/vendor/orders/:orderId/deliver', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'vendor') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. Vendor only.' 
+            });
+        }
+
+        const Vendor = require('../models/Vendor');
+        const vendor = await Vendor.findOne({ user: req.user._id });
+        
+        if (!vendor) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Vendor profile not found' 
+            });
+        }
+
+        const order = await Order.findOne({ 
+            _id: req.params.orderId, 
+            assignedVendor: vendor._id 
+        });
+
+        if (!order) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Order not found or not assigned to you' 
+            });
+        }
+
+        if (order.status !== 'picked_up') {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Cannot mark as delivered. Current status: ${order.status}` 
+            });
+        }
+
+        order.status = 'delivered';
+        order.deliveredAt = new Date();
+        await order.save();
+
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`order-${order._id}`).emit('order-status-update', {
+                orderId: order._id,
+                status: 'delivered',
+                message: 'Order has been delivered'
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Order marked as delivered', 
+            data: order 
+        });
+        
+    } catch (error) {
+        console.error('Error marking order as delivered:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
 module.exports = router;

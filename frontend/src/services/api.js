@@ -1,15 +1,11 @@
 import axios from 'axios';
 
-// Temporarily hardcode for deployment
-const API_URL = 'https://campus-mart-lbim.onrender.com/api';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8003/api';
 
 const API = axios.create({
-    baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json'
-    }
+  baseURL: API_URL
 });
-
 // Add token to every request
 API.interceptors.request.use(
     (config) => {

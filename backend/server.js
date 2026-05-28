@@ -19,6 +19,7 @@ const reviewRoutes = require('./routes/reviews');
 const wishlistRoutes = require('./routes/wishlist');
 const flashSaleRoutes = require('./routes/flashSales');
 
+
 const trackingRoutes = require('./routes/tracking');
 
 const app = express();
@@ -68,6 +69,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/flash-sales', flashSaleRoutes);
+
 
 app.use('/api/tracking', trackingRoutes);
 
