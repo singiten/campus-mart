@@ -18,28 +18,31 @@ const adminRoutes = require('./routes/admin');
 const reviewRoutes = require('./routes/reviews');
 const wishlistRoutes = require('./routes/wishlist');
 const flashSaleRoutes = require('./routes/flashSales');
-
-
 const trackingRoutes = require('./routes/tracking');
 
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io with Render compatibility
+// Clean up the frontend origin variable safely (Removes trailing slashes if present)
+const allowedOrigin = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.replace(/\/$/, "") 
+    : 'http://localhost:3000';
+
+// Socket.io with dynamic CORS origin mapping
 const io = socketIO(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: allowedOrigin,
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket', 'polling']  // Important for Render
+    transports: ['websocket', 'polling']  // Important for Render stability
 });
 
 app.set('io', io);
 
-// Middleware
+// Express Middleware setup with identical CORS permissions
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigin,
     credentials: true
 }));
 app.use(express.json());
@@ -69,11 +72,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/flash-sales', flashSaleRoutes);
-
-
 app.use('/api/tracking', trackingRoutes);
 
-// Health check endpoint for Render
+// Health check endpoint for Render monitoring
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
@@ -142,6 +143,6 @@ io.on('connection', (socket) => {
 // Start server
 const PORT = process.env.PORT || 8003;
 server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📡 Socket.io server ready`);
 });
